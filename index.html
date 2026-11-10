@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apple Retail Performance Dashboard</title>
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR: title, filters, page switch -->
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Apple Retail Performance</h1>
+      <p>For retail operations managers</p>
+    </div>
+
+    <nav class="tabs" aria-label="Pages">
+      <button type="button" class="tab" data-page="page-dashboard" aria-pressed="true">Dashboard</button>
+      <button type="button" class="tab" data-page="page-insights" aria-pressed="false">Insights &amp; notes</button>
+    </nav>
+
+    <section class="filters" aria-label="Filters">
+      <h2>Filters</h2>
+      <label class="filter">
+        <span>Year</span>
+        <select id="filter-year"></select>
+      </label>
+      <label class="filter">
+        <span>Country</span>
+        <select id="filter-country"></select>
+      </label>
+      <label class="filter">
+        <span>Product category</span>
+        <select id="filter-category"></select>
+      </label>
+      <button id="reset-filters" class="btn-reset" type="button">Reset filters</button>
+      <p id="filter-summary" class="filter-summary" aria-live="polite"></p>
+    </section>
+
+    <p class="sidebar-foot">Data: Apple Retail Sales (Kaggle) · 1,033,218 sales · Jan 2020 – Oct 2024 · 75 stores · 19 countries. Revenue = units × product list price.</p>
+  </aside>
+
+  <!-- PAGE 1: the dashboard (fits one landscape screen) -->
+  <main id="page-dashboard" class="page dashboard">
+    <section class="kpi-row" aria-label="Key metrics">
+      <article class="kpi" id="kpi-revenue">
+        <h2 class="kpi-label">Total revenue</h2>
+        <p class="kpi-value"></p>
+        <p class="kpi-delta"></p>
+        <p class="kpi-context">Σ units × list price</p>
+      </article>
+      <article class="kpi" id="kpi-units">
+        <h2 class="kpi-label">Units sold</h2>
+        <p class="kpi-value"></p>
+        <p class="kpi-delta"></p>
+        <p class="kpi-context">Σ quantity</p>
+      </article>
+      <article class="kpi" id="kpi-aov">
+        <h2 class="kpi-label">Avg revenue per sale</h2>
+        <p class="kpi-value"></p>
+        <p class="kpi-delta"></p>
+        <p class="kpi-context">Revenue ÷ sales transactions</p>
+      </article>
+      <article class="kpi" id="kpi-store">
+        <h2 class="kpi-label">Revenue per store per month</h2>
+        <p class="kpi-value"></p>
+        <p class="kpi-delta"></p>
+        <p class="kpi-context">Revenue ÷ (stores × months)</p>
+      </article>
+      <article class="kpi" id="kpi-claims">
+        <h2 class="kpi-label">Warranty claim rate</h2>
+        <p class="kpi-value"></p>
+        <p class="kpi-delta"></p>
+        <p class="kpi-context">Claims ÷ sales</p>
+      </article>
+    </section>
+
+    <section class="chart-grid">
+      <article class="card area-trend" id="card-trend">
+        <div class="card-head">
+          <div>
+            <h2>Monthly revenue trend</h2>
+            <p class="card-sub" id="trend-sub"></p>
+          </div>
+          <div class="card-actions">
+            <div class="legend" id="trend-legend"></div>
+            <button class="btn-table" type="button" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="chart" id="chart-trend"></div>
+        <div class="table-view" hidden></div>
+      </article>
+
+      <article class="card area-category" id="card-category">
+        <div class="card-head">
+          <div>
+            <h2>Revenue by category</h2>
+            <p class="card-sub">USD and share of total</p>
+          </div>
+          <div class="card-actions"><button class="btn-table" type="button" aria-pressed="false">Table</button></div>
+        </div>
+        <div class="chart" id="chart-category"></div>
+        <div class="table-view" hidden></div>
+      </article>
+
+      <article class="card area-warranty" id="card-warranty">
+        <div class="card-head">
+          <div>
+            <h2>Warranty claims by status</h2>
+            <p class="card-sub" id="warranty-note"></p>
+          </div>
+          <div class="card-actions"><button class="btn-table" type="button" aria-pressed="false">Table</button></div>
+        </div>
+        <div class="chart" id="chart-warranty"></div>
+        <div class="table-view" hidden></div>
+      </article>
+
+      <article class="card area-products" id="card-products">
+        <div class="card-head">
+          <div>
+            <h2>Product revenue</h2>
+            <p class="card-sub"></p>
+          </div>
+          <div class="card-actions">
+            <div class="toggle" role="group" aria-label="Product ranking">
+              <button type="button" data-view="top" aria-pressed="true">Top 10</button>
+              <button type="button" data-view="bottom" aria-pressed="false">Bottom 10</button>
+            </div>
+            <button class="btn-table" type="button" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="chart" id="chart-products"></div>
+        <div class="table-view" hidden></div>
+      </article>
+
+      <article class="card area-stores" id="card-stores">
+        <div class="card-head">
+          <div>
+            <h2>Store revenue</h2>
+            <p class="card-sub"></p>
+          </div>
+          <div class="card-actions">
+            <div class="toggle" role="group" aria-label="Store ranking">
+              <button type="button" data-view="top" aria-pressed="true">Top 10</button>
+              <button type="button" data-view="bottom" aria-pressed="false">Bottom 10</button>
+            </div>
+            <button class="btn-table" type="button" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="chart" id="chart-stores"></div>
+        <div class="table-view" hidden></div>
+      </article>
+
+      <article class="card area-map" id="card-map">
+        <div class="card-head">
+          <div>
+            <h2>Revenue by city</h2>
+            <p class="card-sub" id="map-sub"></p>
+          </div>
+          <div class="card-actions">
+            <button class="btn-table" type="button" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="chart map" id="chart-map" role="region" aria-label="Map of store cities; bubble size shows revenue. Use the Table button for the same figures as a list."></div>
+        <div class="table-view" hidden></div>
+      </article>
+    </section>
+  </main>
+
+  <!-- PAGE 2: insights, KPI definitions, data notes -->
+  <main id="page-insights" class="page insights-page" hidden>
+    <section class="panel" aria-labelledby="insights-title">
+      <h2 id="insights-title">Key insights for managers</h2>
+      <p class="panel-sub">Based on all data, Jan 2020 – Oct 2024. Use the filters on the Dashboard page to explore each point.</p>
+      <ol class="insight-list">
+        <li>
+          <h3>Revenue is flat, not growing</h3>
+          <p>Jan–Oct revenue stayed between $1.05B and $1.06B every year from 2020 to 2024 (2024: +0.9% vs. 2023), with no holiday spike in Q4.
+          <strong>Implication:</strong> growth will have to come from new stores or a better product mix. Staffing and inventory can be planned on a steady monthly baseline.</p>
+        </li>
+        <li>
+          <h3>Monthly differences come from the number of days</h3>
+          <p>February has the lowest average monthly total ($98.2M vs. $108.6M in March), but revenue per day is $3.43M–$3.50M in every month, so the dip is simply the shorter month (pick a single year to see the pattern in the monthly trend chart).
+          <strong>Implication:</strong> no month is a true peak or slump. Compare months on a per-day basis before acting on a "slow month".</p>
+        </li>
+        <li>
+          <h3>Every location performs alike, so country totals reflect store count</h3>
+          <p>Revenue per store per month is $1.38M–$1.43M in all 19 countries. The US earns 20% of revenue because it has 20% of the stores (15 of 75).
+          <strong>Implication:</strong> no market is under- or over-performing per store. Expansion decisions should rest on where to add stores, not on which existing stores to fix.</p>
+        </li>
+        <li>
+          <h3>The real gap is between individual products</h3>
+          <p>The top product (Apple Music, $124.8M) earned 8× the bottom product (MacBook (Retina), $14.8M). Category totals mostly follow how many products each category has.
+          <strong>Implication:</strong> review the bottom 10 products for promotion or discontinuation; that's where the mix can change.</p>
+        </li>
+        <li>
+          <h3>About half of 2024 warranty claims are still open</h3>
+          <p>Claims are steady at 2.7%–3.0% of sales in every category, but 51% are still Pending or In Progress, and 25% were Rejected.
+          <strong>Implication:</strong> the issue is service capacity, not product quality. Clearing the repair backlog should be a priority.</p>
+        </li>
+      </ol>
+    </section>
+
+    <div class="two-col">
+      <section class="panel" aria-labelledby="kpi-def-title">
+        <h2 id="kpi-def-title">How each measure is calculated</h2>
+        <table class="def-table">
+          <thead><tr><th>Measure</th><th>Formula</th></tr></thead>
+          <tbody>
+            <tr><td>Revenue (one sale)</td><td>quantity × product list price (Products sheet)</td></tr>
+            <tr><td>Total revenue</td><td>Σ revenue of all sales matching the filters</td></tr>
+            <tr><td>Units sold</td><td>Σ quantity</td></tr>
+            <tr><td>Avg revenue per sale</td><td>total revenue ÷ number of sales transactions</td></tr>
+            <tr><td>Revenue per store per month</td><td>total revenue ÷ (stores in view × months in view)</td></tr>
+            <tr><td>Warranty claim rate</td><td>claims on sales in view ÷ sales in view</td></tr>
+            <tr><td>% change on KPIs</td><td>(selected year − same months of prior year) ÷ same months of prior year; claim rate shown in percentage points</td></tr>
+            <tr><td>Map: city revenue</td><td>Σ revenue of the city's stores matching the filters; bubble area is proportional to revenue, scaled to the largest city in view</td></tr>
+            <tr><td>Map: city claim rate</td><td>claims on the city's sales in view ÷ the city's sales in view</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel" aria-labelledby="notes-title">
+        <h2 id="notes-title">Data notes and limitations</h2>
+        <ul class="notes">
+          <li><strong>Source:</strong> Apple Retail Sales dataset (Kaggle): 1,040,200 sales, 89 products, 75 stores, 30,000 warranty claims.</li>
+          <li><strong>Excluded:</strong> 6,982 sales from 1–12 Nov 2024 (the data stops mid-month) and the 203 warranty claims tied to them. December 2024 is not in the data.</li>
+          <li><strong>Revenue</strong> uses each product's list price; discounts and actual selling prices are not in the data.</li>
+          <li><strong>Duplicate names:</strong> six store names (e.g., Apple Chadstone) and "HomePod mini" appear under two different IDs. They are kept separate and labeled with their store ID or category.</li>
+          <li><strong>Launch dates look unreliable:</strong> 48% of sales are dated before the product's listed launch date. These sales are kept but should be treated with caution.</li>
+          <li><strong>Warranty:</strong> all claims are dated in 2024, and 2,488 are dated before their sale date. Claim rate means the share of sales with a claim filed in 2024.</li>
+          <li>The sales are spread very evenly across stores and months, which suggests the dataset is synthetic. Patterns may not reflect real Apple retail behavior.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="tooltip" class="tooltip" role="status" hidden></div>
+
+<!-- Data first, then the map library and city positions, then chart helpers, then the app logic -->
+<script src="data/data.js"></script>
+<script src="lib/leaflet/leaflet.js"></script>
+<script src="js/cities.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

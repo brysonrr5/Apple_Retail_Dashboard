@@ -1,0 +1,199 @@
+/* ===== Design tokens (colors, spacing) — change values here, not in the rules below ===== */
+:root {
+  --page: #eef0f3;          /* page background */
+  --surface: #ffffff;       /* card / chart background */
+  --sidebar: #1b2a3a;       /* sidebar background (navy) */
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #b8c4d1;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6f6d67;    /* axis labels (4.5:1 contrast on white) */
+  --grid: #e4e5e8;          /* hairline gridlines */
+  --axis: #c3c2b7;          /* baseline */
+  --border: rgba(11, 11, 11, 0.09);
+  --series-1: #2a78d6;      /* main data color (blue) */
+  --series-muted: #c3c2b7;  /* de-emphasized marks (prior year, unselected bars) */
+  --good: #006300;          /* "better" delta text */
+  --bad: #b42323;           /* "worse" delta text */
+  --radius: 8px;
+  --gap: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text-primary);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); line-height: 1.4; }
+h1, h2, h3, p { margin: 0; }
+[hidden] { display: none !important; }
+
+/* ===== App frame: sidebar + page, filling one landscape screen ===== */
+.app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  background: var(--sidebar); color: var(--sidebar-text);
+  padding: 20px 18px; display: flex; flex-direction: column; gap: 22px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.brand h1 { font-size: 18px; font-weight: 650; line-height: 1.25; }
+.brand p { font-size: 12px; color: var(--sidebar-muted); margin-top: 4px; }
+.tabs { display: flex; flex-direction: column; gap: 4px; }
+.tab {
+  font: inherit; font-size: 13px; text-align: left; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  border: 0; background: transparent; color: var(--sidebar-muted);
+}
+.tab:hover { background: rgba(255, 255, 255, 0.08); color: var(--sidebar-text); }
+.tab[aria-pressed="true"] { background: rgba(255, 255, 255, 0.14); color: var(--sidebar-text); font-weight: 600; }
+.filters { display: flex; flex-direction: column; gap: 12px; }
+.filters h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sidebar-muted); font-weight: 600; }
+.filter { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+.filter select {
+  font: inherit; font-size: 13px; font-weight: 400; width: 100%; padding: 7px 8px;
+  border: 1px solid transparent; border-radius: 6px; background: #fff; color: var(--text-primary);
+}
+.btn-reset {
+  font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.35); background: transparent; color: var(--sidebar-text);
+}
+.btn-reset:hover { background: rgba(255, 255, 255, 0.08); }
+.filter-summary { font-size: 12px; color: var(--sidebar-muted); }
+.sidebar-foot { margin-top: auto; font-size: 11px; color: var(--sidebar-muted); }
+.sidebar select:focus-visible, .sidebar button:focus-visible { outline: 2px solid #8ec1ff; outline-offset: 2px; }
+button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+/* ===== Dashboard page ===== */
+.dashboard { display: flex; flex-direction: column; gap: var(--gap); padding: 14px 16px; height: 100vh; min-width: 0; }
+
+/* KPI strip */
+.kpi-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap); flex: 0 0 auto; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; border-top: 3px solid var(--series-1); }
+.kpi-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-value { font-size: 26px; font-weight: 650; margin: 2px 0; letter-spacing: -0.01em; }
+.kpi-delta { font-size: 12px; font-weight: 600; min-height: 1.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-delta.good { color: var(--good); }
+.kpi-delta.bad { color: var(--bad); }
+.kpi-delta.neutral { color: var(--text-secondary); font-weight: 500; }
+.kpi-context { font-size: 11px; color: var(--text-muted); }
+
+/* Chart grid: 2 rows that share the remaining height */
+.chart-grid {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; gap: var(--gap);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+.area-trend { grid-column: span 6; }
+.area-category, .area-warranty { grid-column: span 3; }
+.area-products, .area-stores, .area-map { grid-column: span 4; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; min-width: 0; min-height: 0; display: flex; flex-direction: column;
+}
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; flex: 0 0 auto; }
+.card-head > div:first-child { min-width: 0; }
+.card h2 { font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.chart { flex: 1 1 auto; min-height: 0; position: relative; }
+.chart > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* Small buttons: segmented toggle + table switch */
+.toggle { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
+.toggle button, .btn-table {
+  font: inherit; font-size: 11px; padding: 3px 8px; border: 0; background: transparent; cursor: pointer; color: var(--text-secondary);
+}
+.toggle button + button { border-left: 1px solid var(--axis); }
+.toggle button[aria-pressed="true"] { background: var(--sidebar); color: #fff; }
+.btn-table { border: 1px solid var(--axis); border-radius: 6px; }
+.btn-table[aria-pressed="true"] { background: var(--sidebar); color: #fff; border-color: var(--sidebar); }
+
+/* Legend */
+.legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); margin-right: 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.legend i { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
+
+/* SVG chart parts */
+.axis-label { font-size: 10.5px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bar-label { font-size: 11.5px; fill: var(--text-primary); }
+.value-label { font-size: 10.5px; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.halo { stroke: var(--surface); stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.baseline { stroke: var(--axis); stroke-width: 1; }
+.mark { transition: opacity 0.15s; }
+.mark-hit { fill: transparent; }
+.mark-group:hover .mark, .mark-group:focus .mark { opacity: 0.75; }
+.mark-group:focus { outline: none; }
+.mark-group:focus-visible .mark { stroke: var(--text-primary); stroke-width: 1.5; }
+.crosshair { stroke: var(--text-muted); stroke-width: 1; }
+
+/* Store map (Leaflet). isolation keeps the map's own layers inside the card,
+   so the shared tooltip and the rest of the page always sit on top of it. */
+.chart.map { isolation: isolate; border-radius: 6px; overflow: hidden; background: #f2f2f0; font: inherit; }
+.chart.map .leaflet-control-attribution { font-size: 9.5px; color: var(--text-muted); background: rgba(255, 255, 255, 0.8); }
+.chart.map .leaflet-control-attribution a { color: var(--text-secondary); }
+.chart.map .leaflet-control-zoom a { width: 24px; height: 24px; line-height: 24px; font-size: 15px; }
+.chart.map .leaflet-interactive:focus { outline: none; }
+
+/* Table view (replaces the chart inside the card) */
+.table-view { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.table-view table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table-view th, .table-view td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--grid); }
+.table-view th { position: sticky; top: 0; background: var(--surface); color: var(--text-secondary); font-weight: 600; }
+.table-view td.num, .table-view th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Tooltip */
+.tooltip {
+  position: fixed; z-index: 20; pointer-events: none; min-width: 140px; max-width: 280px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); padding: 8px 10px; font-size: 12px;
+}
+.tooltip .tt-title { color: var(--text-secondary); margin-bottom: 4px; }
+.tooltip .tt-row { display: flex; align-items: center; gap: 8px; }
+.tooltip .tt-row b { font-size: 14px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.tooltip .tt-row i { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
+.tooltip .tt-row span { color: var(--text-secondary); }
+
+/* ===== Insights page ===== */
+.insights-page { padding: 16px; display: flex; flex-direction: column; gap: var(--gap); min-width: 0; height: 100vh; overflow-y: auto; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.panel > h2 { font-size: 17px; font-weight: 650; }
+.panel-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.insight-list { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; counter-reset: insight; }
+.insight-list li { counter-increment: insight; border-top: 3px solid var(--series-1); padding-top: 10px; }
+.insight-list h3 { font-size: 14px; font-weight: 650; margin-bottom: 4px; }
+.insight-list h3::before { content: counter(insight) ". "; color: var(--text-secondary); }
+.insight-list p { font-size: 13px; color: var(--text-secondary); }
+.insight-list strong, .notes strong { color: var(--text-primary); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.def-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+.def-table th, .def-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+.def-table th { color: var(--text-secondary); font-weight: 600; }
+.def-table td:first-child { font-weight: 600; white-space: nowrap; }
+.notes { margin: 10px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); }
+.notes li { margin-bottom: 5px; }
+
+/* ===== Laptop-size screens: slimmer sidebar and KPI numbers ===== */
+@media (max-width: 1400px) {
+  .app { grid-template-columns: 210px minmax(0, 1fr); }
+  .kpi-value { font-size: 22px; }
+  .card-actions { gap: 4px; }
+  .toggle button, .btn-table { padding: 3px 6px; }
+}
+
+/* ===== Smaller or shorter screens: let the page scroll and give charts fixed heights ===== */
+@media (max-width: 1100px), (max-height: 680px) {
+  .dashboard, .insights-page { height: auto; overflow: visible; }
+  .chart-grid { grid-template-rows: none; }
+  .area-trend, .area-category, .area-warranty, .area-products, .area-stores, .area-map { grid-column: span 6; }
+  .area-trend { grid-column: span 12; }
+  .card { min-height: 300px; }
+  .area-products, .area-stores { min-height: 380px; }
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .area-trend, .area-category, .area-warranty, .area-products, .area-stores, .area-map { grid-column: span 12; }
+}
