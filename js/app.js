@@ -24,7 +24,7 @@
   const color = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   // Current selections. 'all' means no filter; otherwise a year number or a list index.
-  const state = { year: 'all', country: 'all', category: 'all', products: 'top', stores: 'top' };
+  const state = { year: 'all', country: 'all', category: 'all', stores: 'top' };
 
   // ---------- number formatting ----------
   function money(v) {
@@ -141,52 +141,104 @@
   }
 
   // ---------- chart: monthly revenue trend ----------
+  // Revenue per day: each month's revenue ÷ its number of days (so 28-day Februaries don't look like slumps).
+  // 3-month rolling average = revenue of this month and the two before it ÷ the days in those three months.
+  const daysIn = (mi) => new Date(yearOf(mi), monthOf(mi) + 1, 0).getDate(); // leap years give Feb 29 days
+  function monthlySeries() {
+    const rev = new Array(N_MONTHS).fill(0);
+    rowsA({ year: 'all' }).forEach((r) => { rev[r[0]] += r[4]; }); // country + category filters still apply
+    const perDay = rev.map((v, i) => v / daysIn(i));
+    const roll = rev.map((_, i) => (i < 2 ? null
+      : (rev[i - 2] + rev[i - 1] + rev[i]) / (daysIn(i - 2) + daysIn(i - 1) + daysIn(i))));
+    return { rev, perDay, roll };
+  }
+
   function renderTrend() {
     const container = document.getElementById('chart-trend');
     const legend = document.getElementById('trend-legend');
-    const blue = color('--series-1'), gray = color('--series-muted');
+    const light = color('--series-1-light'), dark = color('--series-1-dark'), gray = color('--series-muted');
     legend.replaceChildren();
+    const addLegend = (name, c, w) => {
+      const item = document.createElement('span');
+      const key = document.createElement('i'); key.style.background = c; key.style.height = `${w}px`; item.appendChild(key);
+      item.appendChild(document.createTextNode(name));
+      legend.appendChild(item);
+    };
+    const { rev, perDay, roll } = monthlySeries();
+    const AXIS_NOTE = 'axis does not start at $0';
 
     if (state.year === 'all') {
-      const values = new Array(N_MONTHS).fill(0);
-      rowsA().forEach((r) => { values[r[0]] += r[4]; });
-      const labels = values.map((_, i) => `${MONTHS_LONG[monthOf(i)]} ${yearOf(i)}`);
-      document.getElementById('trend-sub').textContent = `USD per month, Jan 2020 – ${LAST_LABEL} · axis does not start at $0`;
+      const labels = rev.map((_, i) => `${MONTHS_LONG[monthOf(i)]} ${yearOf(i)}`);
+      addLegend('Per day', light, 2);
+      addLegend('3-month avg', dark, 3.5);
+      document.getElementById('trend-sub').textContent = `USD per day, by month · ${AXIS_NOTE}`;
       Charts.line(container, {
         labels,
-        ticks: values.map((_, i) => i).filter((i) => monthOf(i) === 0),
+        ticks: rev.map((_, i) => i).filter((i) => monthOf(i) === 0),
         tickText: (i) => String(yearOf(i)),
-        series: [{ name: 'Revenue', color: blue, values }],
-      }, { format: money, axisFormat: axisMoney, ariaLabel: 'Monthly revenue over time' });
+        series: [
+          { name: 'Per day', color: light, width: 1.5, values: perDay },
+          { name: '3-month avg', color: dark, width: 3, values: roll },
+        ],
+      }, {
+        format: money, axisFormat: axisMoney, ariaLabel: 'Revenue per day by month, with 3-month rolling average',
+        tipRows: (i) => [
+          { color: light, value: money(perDay[i]), label: 'per day' },
+          { value: money(rev[i]), label: `month total (${daysIn(i)} days)` },
+          roll[i] == null ? { color: dark, value: '—', label: '3-month avg (needs 3 months)' } : { color: dark, value: money(roll[i]), label: '3-month avg per day' },
+        ],
+      });
       tableData['card-trend'] = {
-        columns: [{ label: 'Month' }, { label: 'Revenue (USD)', num: true }],
-        rows: values.map((v, i) => [labels[i], fullMoney(v)]),
+        columns: [{ label: 'Month' }, { label: 'Days', num: true }, { label: 'Revenue (USD)', num: true }, { label: 'Per day', num: true }, { label: '3-month avg per day', num: true }],
+        rows: rev.map((v, i) => [labels[i], daysIn(i), fullMoney(v), fullMoney(perDay[i]), roll[i] == null ? '—' : fullMoney(roll[i])]),
       };
     } else {
       const y = state.year;
-      const cur = new Array(12).fill(null), prev = new Array(12).fill(null);
-      rowsA().forEach((r) => { const m = monthOf(r[0]); cur[m] = (cur[m] || 0) + r[4]; });
       const hasPrev = YEARS.includes(y - 1);
-      if (hasPrev) rowsA({ year: y - 1 }).forEach((r) => { const m = monthOf(r[0]); prev[m] = (prev[m] || 0) + r[4]; });
+      const base = (y - FIRST_YEAR) * 12, pbase = base - 12;
+      const inData = (mi) => mi >= 0 && mi < N_MONTHS;
+      const pick = (arr, b) => MONTHS.map((_, m) => (inData(b + m) ? arr[b + m] : null));
+      const cur = pick(perDay, base), curRoll = pick(roll, base), curRev = pick(rev, base);
+      const prev = hasPrev ? pick(perDay, pbase) : [], prevRev = hasPrev ? pick(rev, pbase) : [];
       const series = [];
-      if (hasPrev) series.push({ name: String(y - 1), color: gray, values: prev });
-      series.push({ name: String(y), color: blue, values: cur });
-      [...series].reverse().forEach((s) => {
-        const item = document.createElement('span');
-        const key = document.createElement('i'); key.style.background = s.color; item.appendChild(key);
-        item.appendChild(document.createTextNode(s.name));
-        legend.appendChild(item);
-      });
-      document.getElementById('trend-sub').textContent = `USD per month, ${y}${hasPrev ? ` vs ${y - 1}` : ''}${monthsInYear(y) < 12 ? ` · data ends ${LAST_LABEL}` : ''} · axis does not start at $0`;
+      if (hasPrev) series.push({ name: `${y - 1} per day`, color: gray, width: 1.5, values: prev });
+      series.push({ name: `${y} per day`, color: light, width: 1.5, values: cur });
+      series.push({ name: `${y} 3-month avg`, color: dark, width: 3, values: curRoll });
+      addLegend(`${y} per day`, light, 2);
+      addLegend(`${y} 3-month avg`, dark, 3.5);
+      if (hasPrev) addLegend(`${y - 1} per day`, gray, 2);
+      document.getElementById('trend-sub').textContent =
+        `USD per day, by month${monthsInYear(y) < 12 ? ` · data ends ${LAST_LABEL}` : ''} · ${AXIS_NOTE}`;
       Charts.line(container, {
-        labels: MONTHS_LONG,
+        labels: MONTHS_LONG.map((m) => `${m} ${y}`),
         ticks: MONTHS.map((_, i) => i),
         tickText: (i) => MONTHS[i],
         series,
-      }, { format: money, axisFormat: axisMoney, ariaLabel: `Monthly revenue in ${y}` });
+      }, {
+        format: money, axisFormat: axisMoney, ariaLabel: `Revenue per day by month in ${y}${hasPrev ? ` compared with ${y - 1}` : ''}, with 3-month rolling average`,
+        tipRows: (m) => {
+          const rows = cur[m] == null
+            ? [{ value: 'No data', label: `(data ends ${LAST_LABEL})` }]
+            : [
+              { color: light, value: money(cur[m]), label: 'per day' },
+              { value: money(curRev[m]), label: `month total (${daysIn(base + m)} days)` },
+              curRoll[m] == null
+                ? { color: dark, value: '—', label: '3-month avg (needs 3 months)' }
+                : { color: dark, value: money(curRoll[m]), label: '3-month avg per day' },
+            ];
+          if (hasPrev && prev[m] != null) {
+            rows.push({ color: gray, value: money(prev[m]), label: `per day in ${y - 1}` });
+            rows.push({ value: money(prevRev[m]), label: `${y - 1} month total (${daysIn(pbase + m)} days)` });
+          }
+          return rows;
+        },
+      });
+      const dash = (v) => (v == null ? '—' : fullMoney(v));
       tableData['card-trend'] = {
-        columns: [{ label: 'Month' }, { label: `${y} revenue`, num: true }].concat(hasPrev ? [{ label: `${y - 1} revenue`, num: true }] : []),
-        rows: MONTHS_LONG.map((m, i) => [m, cur[i] == null ? '—' : fullMoney(cur[i])].concat(hasPrev ? [prev[i] == null ? '—' : fullMoney(prev[i])] : [])),
+        columns: [{ label: 'Month' }, { label: 'Days', num: true }, { label: `${y} revenue`, num: true }, { label: `${y} per day`, num: true }, { label: `${y} 3-month avg`, num: true }]
+          .concat(hasPrev ? [{ label: `${y - 1} per day`, num: true }, { label: `${y - 1} revenue`, num: true }] : []),
+        rows: MONTHS_LONG.map((m, i) => [m, daysIn(base + i), dash(curRev[i]), dash(cur[i]), dash(curRoll[i])]
+          .concat(hasPrev ? [dash(prev[i]), dash(prevRev[i])] : [])),
       };
     }
   }
@@ -214,26 +266,52 @@
   }
 
   // ---------- chart: product ranking ----------
+  // ---------- chart: product revenue concentration ----------
+  // Products ranked by revenue; the curve shows the running share of revenue as products are added.
   function renderProducts() {
     const sums = sumBy(rowsB(), 2, D.products.length)
       .map((s, i) => ({ i, ...s }))
       .filter((s) => s.n > 0 && (state.category === 'all' || productCategory[s.i] === state.category));
     const ranked = [...sums].sort((a, b) => b.rev - a.rev);
-    const shown = state.products === 'top' ? ranked.slice(0, 10) : [...ranked].reverse().slice(0, 10);
-    const max = ranked.length ? ranked[0].rev : 1; // same scale for Top and Bottom views
-    const items = shown.map((s) => ({
-      label: D.products[s.i][0],
-      value: s.rev,
-      valueText: money(s.rev),
-      tipTitle: `${D.products[s.i][0]} · ${D.categories[productCategory[s.i]]}`,
-      tipRows: [{ value: fullMoney(s.rev), label: 'revenue' }, { value: int(s.units), label: 'units' }, { value: `#${ranked.indexOf(s) + 1} of ${ranked.length}`, label: 'rank' }],
+    const n = ranked.length;
+    const total = ranked.reduce((a, s) => a + s.rev, 0);
+    let run = 0;
+    const cum = ranked.map((s) => (run += s.rev) / (total || 1));
+    const items = ranked.map((s, k) => ({
+      share: cum[k],
+      tipTitle: D.products[s.i][0],
+      tipRows: [
+        { value: `#${k + 1} of ${n}`, label: 'by revenue' },
+        { value: fullMoney(s.rev), label: 'revenue' },
+        { value: pct(cum[k]), label: k === 0 ? 'of revenue (this product)' : `of revenue (top ${k + 1} combined)` },
+      ],
     }));
-    Charts.hBar(document.getElementById('chart-products'), items, { max, maxLabelShare: 0.46, ariaLabel: `${state.products === 'top' ? 'Top' : 'Bottom'} products by revenue` });
-    document.querySelector('#card-products .card-sub').textContent =
-      `${state.products === 'top' ? 'Top' : 'Bottom'} ${shown.length} of ${ranked.length} products, USD${state.products === 'bottom' ? ', lowest first' : ''}`;
+
+    // Markers. "Top 10" only means something when there are more than 10 products in view.
+    // "Top 20%" = 20% of products rounded to the nearest whole product (89 → 18), at least 1.
+    // If rounding moves it far from 20% (small categories), the label states the actual count and share.
+    const markers = [];
+    if (n > 10) markers.push({ k: 10, text: `Top 10 products = ${pct(cum[9])} of revenue` });
+    const k20 = Math.max(1, Math.round(n * 0.2));
+    if (n > 1) {
+      markers.push({
+        k: k20,
+        text: Math.abs(k20 / n - 0.2) <= 0.05
+          ? `Top 20% of products = ${pct(cum[k20 - 1])} of revenue`
+          : `Top ${k20} product${k20 > 1 ? 's' : ''} (${pct(k20 / n, 0)}) = ${pct(cum[k20 - 1])} of revenue`,
+      });
+    }
+    Charts.concentration(document.getElementById('chart-products'), items, {
+      markers,
+      xTitle: 'Products, ranked from highest to lowest revenue (% of products)',
+      diagonalLabel: 'Equal revenue per product',
+      ariaLabel: `Product revenue concentration, ${n} products. ${markers.map((mk) => mk.text).join('. ')}`,
+    });
     tableData['card-products'] = {
-      columns: [{ label: 'Rank', num: true }, { label: 'Product' }, { label: 'Category' }, { label: 'Revenue (USD)', num: true }, { label: 'Units', num: true }],
-      rows: ranked.map((s, k) => [k + 1, D.products[s.i][0], D.categories[productCategory[s.i]], fullMoney(s.rev), int(s.units)]),
+      columns: [{ label: 'Rank', num: true }, { label: 'Product' }, { label: 'Category' }, { label: 'Price', num: true },
+        { label: 'Revenue (USD)', num: true }, { label: 'Units', num: true }, { label: 'Cumulative share', num: true }],
+      rows: ranked.map((s, k) => [k + 1, D.products[s.i][0], D.categories[productCategory[s.i]], fullMoney(s.rev / s.units),
+        fullMoney(s.rev), int(s.units), pct(cum[k])]),
     };
   }
 
@@ -350,16 +428,26 @@
   // ---------- chart: warranty claims by status ----------
   function renderWarranty() {
     const t = totals(rowsA());
+    // data order is Completed, In Progress, Pending, Rejected (D.meta.statuses); colors follow the status, not its size
+    const colors = ['--status-completed', '--status-progress', '--status-pending', '--status-rejected'];
+    const style = getComputedStyle(document.documentElement);
     const items = D.meta.statuses.map((name, k) => ({
       label: name,
       value: t.claims[k],
+      color: style.getPropertyValue(colors[k]).trim(),
       valueText: `${int(t.claims[k])} · ${pct(t.claimTotal ? t.claims[k] / t.claimTotal : 0, 0)}`,
       tipRows: [{ value: int(t.claims[k]), label: 'claims' }, { value: pct(t.claimTotal ? t.claims[k] / t.claimTotal : 0), label: 'of claims' }],
     }));
-    Charts.hBar(document.getElementById('chart-warranty'), items, { valueWidth: 82, maxRowHeight: 60, maxBar: 24, ariaLabel: 'Warranty claims by repair status' });
-    const open = t.claims[1] + t.claims[2];
+    const open = t.claims[1] + t.claims[2]; // In Progress + Pending
+    Charts.donut(document.getElementById('chart-warranty'), items, {
+      ariaLabel: t.claimTotal
+        ? `Warranty claims by repair status, ${pct(open / t.claimTotal, 0)} still open`
+        : 'Warranty claims by repair status: no claims in this selection',
+      center: { big: t.claimTotal ? pct(open / t.claimTotal, 0) : '', small: 'still open' },
+      emptyText: 'No claims',
+    });
     document.getElementById('warranty-note').textContent = t.claimTotal
-      ? `${int(t.claimTotal)} claims · ${pct(open / t.claimTotal, 0)} still open`
+      ? `${int(t.claimTotal)} claims`
       : 'No claims in this selection';
     tableData['card-warranty'] = {
       columns: [{ label: 'Repair status' }, { label: 'Claims', num: true }, { label: 'Share of claims', num: true }],
@@ -419,7 +507,7 @@
     renderAll();
   });
 
-  // Top/Bottom and Total/Per-day toggles
+  // Top/Bottom toggle (store ranking)
   function bindToggle(cardId, key) {
     const card = document.getElementById(cardId);
     card.querySelectorAll('.toggle button').forEach((btn) => {
@@ -430,7 +518,6 @@
       });
     });
   }
-  bindToggle('card-products', 'products');
   bindToggle('card-stores', 'stores');
 
   // Chart / Table switch on every card

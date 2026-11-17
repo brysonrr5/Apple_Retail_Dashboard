@@ -120,14 +120,10 @@
       <article class="card area-products" id="card-products">
         <div class="card-head">
           <div>
-            <h2>Product revenue</h2>
-            <p class="card-sub"></p>
+            <h2>Product revenue concentration</h2>
+            <p class="card-sub">How much revenue the top products account for</p>
           </div>
           <div class="card-actions">
-            <div class="toggle" role="group" aria-label="Product ranking">
-              <button type="button" data-view="top" aria-pressed="true">Top 10</button>
-              <button type="button" data-view="bottom" aria-pressed="false">Bottom 10</button>
-            </div>
             <button class="btn-table" type="button" aria-pressed="false">Table</button>
           </div>
         </div>
@@ -182,7 +178,7 @@
         </li>
         <li>
           <h3>Monthly differences come from the number of days</h3>
-          <p>February has the lowest average monthly total ($98.2M vs. $108.6M in March), but revenue per day is $3.43M–$3.50M in every month, so the dip is simply the shorter month (pick a single year to see the pattern in the monthly trend chart).
+          <p>February has the lowest average monthly total ($98.2M vs. $108.6M in March), but revenue per day is $3.43M–$3.50M in every month, so the dip is simply the shorter month. The monthly trend chart shows revenue per day, which removes this short-month effect.
           <strong>Implication:</strong> no month is a true peak or slump. Compare months on a per-day basis before acting on a "slow month".</p>
         </li>
         <li>
@@ -191,9 +187,9 @@
           <strong>Implication:</strong> no market is under- or over-performing per store. Expansion decisions should rest on where to add stores, not on which existing stores to fix.</p>
         </li>
         <li>
-          <h3>The real gap is between individual products</h3>
-          <p>The top product (Apple Music, $124.8M) earned 8× the bottom product (MacBook (Retina), $14.8M). Category totals mostly follow how many products each category has.
-          <strong>Implication:</strong> review the bottom 10 products for promotion or discontinuation; that's where the mix can change.</p>
+          <h3>Revenue is spread across many products, not concentrated in a few</h3>
+          <p>The top 10 of 89 products bring in 19.4% of revenue, and the top 20% (18 products) bring in 33.4%, far from an "80/20" pattern. The gap between the top product (Apple Music, $124.8M) and the bottom one (MacBook (Retina), $14.8M) comes from price ($1,965 vs. $231), not volume: both sold about 64,000 units (63,514 vs. 64,093), and every product sells 62,000–65,000.
+          <strong>Implication:</strong> no small group of products carries the business, so dropping or promoting a single product moves total revenue only a little. Pricing and product mix, not sales volume, are the levers.</p>
         </li>
         <li>
           <h3>About half of 2024 warranty claims are still open</h3>
@@ -214,6 +210,8 @@
             <tr><td>Units sold</td><td>Σ quantity</td></tr>
             <tr><td>Avg revenue per sale</td><td>total revenue ÷ number of sales transactions</td></tr>
             <tr><td>Revenue per store per month</td><td>total revenue ÷ (stores in view × months in view)</td></tr>
+            <tr><td>Trend: revenue per day</td><td>the month's revenue ÷ days in that month (Feb = 28, or 29 in 2020 and 2024)</td></tr>
+            <tr><td>Trend: 3-month average</td><td>revenue of the month and the two before it ÷ days in those three months; starts Mar 2020</td></tr>
             <tr><td>Warranty claim rate</td><td>claims on sales in view ÷ sales in view</td></tr>
             <tr><td>% change on KPIs</td><td>(selected year − same months of prior year) ÷ same months of prior year; claim rate shown in percentage points</td></tr>
             <tr><td>Map: city revenue</td><td>Σ revenue of the city's stores matching the filters; bubble area is proportional to revenue, scaled to the largest city in view</td></tr>

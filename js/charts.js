@@ -4,6 +4,8 @@
  *   Charts.hBar(container, items, options)     horizontal ranked bars
  *   Charts.line(container, config, options)    line chart over time with a hover crosshair
  *   Charts.column(container, items, options)   vertical columns (calendar months)
+ *   Charts.donut(container, items, options)    ring of slices with a legend and center text
+ *   Charts.concentration(container, items, opt) cumulative-share curve vs an equal-share diagonal
  *
  * Every chart is drawn as an <svg> that fills the width of its container,
  * and every mark shows a tooltip on mouse hover and on keyboard focus.
@@ -165,7 +167,9 @@ const Charts = (() => {
 
   // ---------- line chart ----------
   // config: { labels: [full x labels], ticks: [index list to label], tickText: fn(i),
-  //           series: [{ name, color, values: [number|null] }] }
+  //           series: [{ name, color, width (default 2), values: [number|null] }] }
+  // Series are drawn in order, so put the one that should sit on top last.
+  // opt.tipRows(i), if given, returns the tooltip rows for month i instead of one row per series.
   function line(container, config, opt = {}) {
     const width = Math.max(container.clientWidth, 200);
     const height = Math.max(container.clientHeight || 260, 120);
@@ -200,7 +204,7 @@ const Charts = (() => {
         d += `${pen ? 'L' : 'M'}${x(i)},${y(v)} `;
         pen = true;
       });
-      svgEl('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+      svgEl('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
       const last = s.values.reduce((acc, v, i) => (v != null ? i : acc), -1);
       if (last >= 0) svgEl('circle', { cx: x(last), cy: y(s.values[last]), r: 4, fill: s.color, stroke: css('--surface'), 'stroke-width': 2 }, svg);
     });
@@ -219,7 +223,7 @@ const Charts = (() => {
         if (v == null) { dots[k].setAttribute('visibility', 'hidden'); return; }
         dots[k].setAttribute('cx', x(current)); dots[k].setAttribute('cy', y(v)); dots[k].setAttribute('visibility', 'visible');
       });
-      const rows = config.series
+      const rows = opt.tipRows ? opt.tipRows(current) : config.series
         .filter((s) => s.values[current] != null)
         .map((s) => ({ color: s.color, value: opt.format(s.values[current]), label: config.series.length > 1 ? s.name : '' }));
       showTip(evt, config.labels[current], rows.length ? rows : [{ value: 'No data' }]);
@@ -279,5 +283,147 @@ const Charts = (() => {
     });
   }
 
-  return { hBar, line, column, showTip, hideTip };
+  // ---------- donut chart ----------
+  // items: [{ label, value, valueText, color, tipTitle, tipRows }] drawn clockwise from 12 o'clock.
+  // opt.center: { big, small } text for the hole; opt.emptyText when every value is 0.
+  // A legend (swatch · name · count and percent) sits beside the ring, or below it when the card is narrow.
+  function arcPath(cx, cy, rOut, rIn, a0, a1) {
+    // a full circle can't be one arc, so split it in two
+    if (a1 - a0 >= Math.PI * 2 - 1e-6) {
+      const mid = a0 + Math.PI;
+      return arcPath(cx, cy, rOut, rIn, a0, mid) + ' ' + arcPath(cx, cy, rOut, rIn, mid, a1);
+    }
+    const pt = (r, a) => `${cx + r * Math.sin(a)},${cy - r * Math.cos(a)}`;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    return `M${pt(rOut, a0)} A${rOut},${rOut} 0 ${large} 1 ${pt(rOut, a1)} L${pt(rIn, a1)} A${rIn},${rIn} 0 ${large} 0 ${pt(rIn, a0)} Z`;
+  }
+  function donut(container, items, opt = {}) {
+    const width = Math.max(container.clientWidth, 160);
+    const height = Math.max(container.clientHeight || 200, 120);
+    const svg = newSvg(container, width, height, opt.ariaLabel || 'Donut chart');
+    const total = items.reduce((a, d) => a + d.value, 0);
+
+    // legend size: swatch + longest name + gap + longest value
+    const nameW = Math.max(...items.map((d) => textWidth(d.label, 11.5)));
+    const valW = Math.max(...items.map((d) => textWidth(d.valueText, 10.5)));
+    const legendW = 10 + 6 + nameW + 10 + valW;
+    const rowH = 20, legendH = items.length * rowH;
+
+    // beside the ring if there is room for a ring at least 110px across; otherwise stacked
+    const besideR = Math.min(height / 2 - 4, (width - legendW - 16) / 2);
+    const beside = besideR >= 55;
+    const R = beside ? besideR : Math.max(30, Math.min((height - legendH - 12) / 2, width / 2 - 4));
+    const cx = beside ? R + 2 : width / 2;
+    const cy = beside ? height / 2 : R + 2;
+    const rIn = R * 0.62;
+    const lx = beside ? Math.min(cx + R + 16, width - legendW) : Math.max(0, (width - legendW) / 2);
+    const ly = beside ? (height - legendH) / 2 : cy + R + 12;
+
+    // center text
+    const center = total ? opt.center : { big: '', small: opt.emptyText || 'No data' };
+    if (!total) svgEl('path', { d: arcPath(cx, cy, R, rIn, 0, Math.PI * 2), fill: css('--grid') }, svg);
+    if (center && center.big) {
+      svgText(svg, cx, cy + 2, center.big, { class: 'donut-big', 'text-anchor': 'middle' });
+      svgText(svg, cx, cy + 18, center.small, { class: 'value-label', 'text-anchor': 'middle' });
+    } else if (center) {
+      svgText(svg, cx, cy + 4, fitText(center.small, rIn * 2 - 8, 10.5), { class: 'value-label', 'text-anchor': 'middle' });
+    }
+
+    let a = 0;
+    items.forEach((d, i) => {
+      const g = svgEl('g', { class: 'mark-group' }, svg);
+      if (total && d.value > 0) {
+        const a1 = a + (d.value / total) * Math.PI * 2;
+        // a 2px surface-colored outline leaves a visible gap between neighbouring slices
+        svgEl('path', { class: 'mark', d: arcPath(cx, cy, R, rIn, a, a1), fill: d.color, stroke: css('--surface'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, g);
+        a = a1;
+      }
+      // legend row (part of the same hover group, so hovering the row or the slice shows the same tooltip)
+      const y = ly + i * rowH;
+      svgEl('rect', { class: 'mark-hit', x: lx - 4, y, width: legendW + 8, height: rowH }, g);
+      svgEl('rect', { class: 'mark', x: lx, y: y + rowH / 2 - 5, width: 10, height: 10, rx: 2, fill: d.color }, g);
+      svgText(g, lx + 16, y + rowH / 2 + 4, d.label, { class: 'bar-label' });
+      svgText(g, lx + legendW, y + rowH / 2 + 4, d.valueText, { class: 'value-label', 'text-anchor': 'end' });
+      bindTip(g, d.tipTitle || d.label, d.tipRows || [{ value: d.valueText }]);
+    });
+  }
+
+  // ---------- concentration curve ----------
+  // items: [{ share, tipTitle, tipRows }] already ranked highest first; share = cumulative fraction (0–1) up to that item.
+  // Point k (1-based) sits at x = k/n of items, y = its cumulative share; the curve starts at (0, 0).
+  // A thin gray diagonal shows equal revenue per item. opt.markers: [{ k, text }] get a dot and a label
+  // placed in the empty lower-right area with a thin pointer line.
+  // Hover snaps to the nearest item; keyboard: one tab stop, left/right arrows step through items.
+  function concentration(container, items, opt = {}) {
+    const width = Math.max(container.clientWidth, 200);
+    const height = Math.max(container.clientHeight || 240, 140);
+    const m = { top: 10, right: 14, bottom: 34, left: 44 };
+    const plotW = width - m.left - m.right, plotH = height - m.top - m.bottom;
+    const svg = newSvg(container, width, height, opt.ariaLabel || 'Concentration chart');
+    if (!items.length) { svgText(svg, m.left, 30, 'No data for this filter combination', { class: 'bar-label' }); return; }
+
+    const n = items.length;
+    const x = (f) => m.left + f * plotW; // f = fraction of items
+    const y = (f) => m.top + plotH - f * plotH; // f = fraction of revenue
+    const px = (k) => x(k / n), py = (k) => y(k === 0 ? 0 : items[k - 1].share);
+    const pctText = (f) => `${Math.round(f * 100)}%`;
+
+    [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+      svgEl('line', { class: t === 0 ? 'baseline' : 'gridline', x1: m.left, x2: m.left + plotW, y1: y(t), y2: y(t) }, svg);
+      svgText(svg, m.left - 8, y(t) + 4, pctText(t), { class: 'axis-label', 'text-anchor': 'end' });
+      svgText(svg, x(t), m.top + plotH + 14, pctText(t), { class: 'axis-label', 'text-anchor': t === 0 ? 'start' : t === 1 ? 'end' : 'middle' });
+    });
+    svgEl('line', { class: 'baseline', x1: m.left, x2: m.left, y1: m.top, y2: m.top + plotH }, svg);
+    svgText(svg, m.left + plotW / 2, height - 4, opt.xTitle || '', { class: 'axis-label', 'text-anchor': 'middle' });
+
+    // equal-share diagonal with a label running along it
+    svgEl('line', { class: 'diagonal', x1: x(0), y1: y(0), x2: x(1), y2: y(1) }, svg);
+    const angle = (Math.atan2(-plotH, plotW) * 180) / Math.PI;
+    const lx = x(0.72), ly = y(0.72) + 12;
+    svgText(svg, lx, ly, opt.diagonalLabel || 'Equal share', { class: 'axis-label halo', 'text-anchor': 'middle', transform: `rotate(${angle} ${lx} ${ly})` });
+
+    // the curve
+    let d = `M${px(0)},${py(0)}`;
+    for (let k = 1; k <= n; k++) d += ` L${px(k)},${py(k)}`;
+    svgEl('path', { d, fill: 'none', stroke: opt.color || css('--series-1'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+
+    // marked points: labels stacked in the lower-right, the higher point gets the higher label
+    const marks = (opt.markers || []).filter((mk) => mk.k >= 1 && mk.k <= n).sort((a, b) => b.k - a.k);
+    const tx = x(1) - 2; // labels are right-aligned to the plot's right edge
+    marks.forEach((mk, j) => {
+      const labelY = m.top + plotH - 18 - (marks.length - 1 - j) * 16; // clear of the x-axis, below the diagonal
+      const w = textWidth(mk.text, 11);
+      svgEl('line', { class: 'leader', x1: px(mk.k), y1: py(mk.k), x2: tx - w - 4, y2: labelY - 4 }, svg);
+      svgText(svg, tx, labelY, mk.text, { class: 'mark-label halo', 'text-anchor': 'end' });
+      svgEl('circle', { cx: px(mk.k), cy: py(mk.k), r: 4, fill: opt.color || css('--series-1'), stroke: css('--surface'), 'stroke-width': 2 }, svg);
+    });
+
+    // hover layer
+    const dot = svgEl('circle', { r: 4.5, fill: opt.color || css('--series-1'), stroke: css('--text-primary'), 'stroke-width': 1.5, visibility: 'hidden' }, svg);
+    const overlay = svgEl('rect', { x: m.left, y: m.top, width: plotW, height: plotH, fill: 'transparent', tabindex: 0,
+      'aria-label': `${opt.ariaLabel || 'Concentration chart'}. Use left and right arrow keys to step through items.` }, svg);
+    let current = 1;
+    function show(k, evt) {
+      current = Math.max(1, Math.min(n, k));
+      dot.setAttribute('cx', px(current)); dot.setAttribute('cy', py(current)); dot.setAttribute('visibility', 'visible');
+      const it = items[current - 1];
+      showTip(evt, it.tipTitle, it.tipRows);
+    }
+    function hide() { dot.setAttribute('visibility', 'hidden'); hideTip(); }
+    overlay.addEventListener('pointermove', (e) => {
+      const box = svg.getBoundingClientRect();
+      const fx = (((e.clientX - box.left) / box.width) * width - m.left) / plotW;
+      show(Math.round(fx * n), e);
+    });
+    overlay.addEventListener('pointerleave', hide);
+    overlay.addEventListener('focus', () => show(current, { type: 'focus', anchor: dot }));
+    overlay.addEventListener('blur', hide);
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      show(current + (e.key === 'ArrowRight' ? 1 : -1), { type: 'keydown', anchor: dot });
+    });
+  }
+
+  return { hBar, line, column, donut, concentration, showTip, hideTip };
 })();
